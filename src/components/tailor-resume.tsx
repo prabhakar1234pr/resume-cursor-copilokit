@@ -81,18 +81,26 @@ export function TailorResumeClient({ resumeId }: { resumeId: string }) {
         body: JSON.stringify({ resume, jobDescription }),
       });
 
+      if (!response.ok) {
+        console.error("Generate failed:", response.status);
+        setLoading(false);
+        return;
+      }
+
       const data = await response.json();
       setTailoredResume(data.tailoredResume);
 
-      await fetch("/api/tailored-resumes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          resumeId,
-          jobDescription,
-          tailoredContent: data.tailoredResume,
-        }),
-      });
+      if (data.tailoredResume) {
+        await fetch("/api/tailored-resumes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resumeId,
+            jobDescription,
+            tailoredContent: data.tailoredResume,
+          }),
+        });
+      }
     } catch (error) {
       console.error("Failed to generate:", error);
     }
