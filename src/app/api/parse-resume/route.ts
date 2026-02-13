@@ -2,21 +2,25 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
+// Allow up to 60 seconds for AI processing
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "Server configuration error" },
-      { status: 500 }
-    );
-  }
-
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (!apiKey) {
+      console.error("GOOGLE_API_KEY is not set");
+      return NextResponse.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
@@ -25,8 +29,14 @@ export async function POST(req: NextRequest) {
     }
 
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64 = buffer.toString("base64");
+    const uint8 = new Uint8Array(bytes);
+    let base64 = "";
+    // Convert to base64 without Buffer for edge compatibility
+    const chunk = 8192;
+    for (let i = 0; i < uint8.length; i += chunk) {
+      base64 += String.fromCharCode(...uint8.subarray(i, i + chunk));
+    }
+    base64 = btoa(base64);
 
     const mimeType = file.type || "application/pdf";
 
@@ -74,9 +84,11 @@ Return ONLY valid JSON with this exact structure (no markdown, no code fences, j
 
     return NextResponse.json(parsed);
   } catch (error) {
-    console.error("Resume parse error:", error);
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error("Resume parse error:", message, error);
     return NextResponse.json(
-      { error: "Failed to parse resume" },
+      { error: "Failed to parse resume: " + message },
       { status: 500 }
     );
   }
