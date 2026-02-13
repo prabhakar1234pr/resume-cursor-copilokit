@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import {
   Sparkles,
@@ -11,6 +11,7 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
+import { marked } from "marked";
 import type { Resume } from "@/lib/db/schema";
 
 export function TailorResumeClient({ resumeId }: { resumeId: string }) {
@@ -20,6 +21,12 @@ export function TailorResumeClient({ resumeId }: { resumeId: string }) {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const resumeHtml = useMemo(() => {
+    if (!tailoredResume) return "";
+    return marked.parse(tailoredResume, { async: false }) as string;
+  }, [tailoredResume]);
 
   useEffect(() => {
     fetch(`/api/resumes/${resumeId}`)
@@ -108,18 +115,50 @@ export function TailorResumeClient({ resumeId }: { resumeId: string }) {
     setLoading(false);
   };
 
-  const downloadResume = () => {
-    const blob = new Blob([tailoredResume], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${resume?.title || "resume"}_tailored.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadPdf = () => {
+    const html = marked.parse(tailoredResume, { async: false }) as string;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${resume?.title || "Resume"} - Tailored</title>
+  <style>
+    @page { margin: 0.75in; size: letter; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.5;
+      font-size: 11pt;
+    }
+    h1 { font-size: 20pt; margin-bottom: 4px; color: #111; }
+    h2 { font-size: 13pt; margin-top: 16px; margin-bottom: 6px; color: #111; border-bottom: 1.5px solid #e5e7eb; padding-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+    h3 { font-size: 11pt; margin-top: 8px; margin-bottom: 2px; }
+    p { margin-bottom: 6px; }
+    ul { margin: 4px 0 8px 18px; }
+    li { margin-bottom: 2px; }
+    strong { color: #111; }
+    a { color: #4f46e5; text-decoration: none; }
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 12px 0; }
+  </style>
+</head>
+<body>${html}</body>
+</html>`);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
   };
 
   const copyToClipboard = async () => {
-    await navigator.clipboard.writeText(tailoredResume);
+    const plainText = tailoredResume
+      .replace(/#{1,6}\s/g, "")
+      .replace(/\*\*/g, "")
+      .replace(/\*/g, "")
+      .replace(/`/g, "");
+    await navigator.clipboard.writeText(plainText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -217,20 +256,22 @@ export function TailorResumeClient({ resumeId }: { resumeId: string }) {
                     {copied ? "Copied!" : "Copy"}
                   </button>
                   <button
-                    onClick={downloadResume}
+                    onClick={downloadPdf}
                     className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-700"
                   >
                     <Download className="h-3.5 w-3.5" />
-                    Download
+                    Download PDF
                   </button>
                 </div>
               )}
             </div>
-            <div className="min-h-[460px] max-h-[540px] overflow-y-auto rounded-xl bg-gray-50 p-6">
+            <div className="min-h-[460px] max-h-[600px] overflow-y-auto rounded-xl bg-white border border-gray-100 p-8">
               {tailoredResume ? (
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700">
-                  {tailoredResume}
-                </pre>
+                <div
+                  ref={previewRef}
+                  className="resume-preview"
+                  dangerouslySetInnerHTML={{ __html: resumeHtml }}
+                />
               ) : (
                 <div className="flex h-full min-h-[400px] flex-col items-center justify-center text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50">
