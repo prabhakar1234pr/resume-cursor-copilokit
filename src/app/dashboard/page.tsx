@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { resumes } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { UserButton } from "@clerk/nextjs";
 import { FileText, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { ResumeCard } from "./resume-card";
@@ -31,12 +32,22 @@ export default async function DashboardPage() {
               Manage and tailor your resumes with AI
             </p>
           </div>
-          <Link href="/resume/new">
-            <button className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
-              <Plus className="h-4 w-4" />
-              New Resume
-            </button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/resume/new">
+              <button className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                <Plus className="h-4 w-4" />
+                New Resume
+              </button>
+            </Link>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: "h-9 w-9",
+                },
+              }}
+            />
+          </div>
         </div>
 
         {userResumes.length === 0 ? (
